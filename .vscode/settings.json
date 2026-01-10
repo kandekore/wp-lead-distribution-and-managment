@@ -1,0 +1,36 @@
+{
+    "svn.ignoreMissingSvnWarning": true,
+    "cSpell.words": [
+        "ABSPATH",
+        "Codeium",
+        "colour",
+        "dashicons",
+        "Kandekore",
+        "leadid",
+        "pagenow",
+        "resends",
+        "txtlocal",
+        "typenow",
+        "widefat",
+        "woocommerce",
+        "wpdb"
+    ],
+    "intelephense.stubs": [
+        "wordpress",
+        "core",
+        "apache", // If you use .htaccess specific functions
+        "zip",
+        "Core",        // Standard PHP functions (like array_map, date, etc.)
+        "standard",    // More standard PHP functions
+        "wordpress",   // Core WordPress functions (like add_action, get_option, etc.)
+        "wp_cli",      // If you use WP-CLI specific functions (optional)
+        "woocommerce"
+    ],
+    "intelephense.environment.includePaths": [
+        "path/to/your/wordpress/core/wp-includes", // Adjust this path if needed
+        "path/to/your/wordpress/core/wp-admin" // Adjust this path if needed
+    ],
+    "intelephense.files.associations": [
+        "*.php" // Ensure PHP files are associated correctly
+    ],
+}
