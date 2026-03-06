@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WordPress Lead Distribution
  * Description: Collects and distributes leads to users on a subscription basis.
- * Version: 4.0.1
+ * Version: 4.2.1
  * Author: D.Kandekore
  */
 

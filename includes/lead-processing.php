@@ -1,63 +1,27 @@
 <?php 
 
-if ( ! defined( 'ABSPATH' ) ) exit;    
+if ( ! defined( 'ABSPATH' ) ) exit;
 
-function process_lead_submission(WP_REST_Request $request) {
-    // Extract common data from the request parameters
-    $lead_data = [
-        'postcode' => strtoupper(sanitize_text_field($request->get_param('postcode'))),
-        'registration' => strtoupper(sanitize_text_field($request->get_param('vrg'))),
-        'model' => sanitize_text_field($request->get_param('model')),
-        'date' => sanitize_text_field($request->get_param('date')),
-        'cylinder' => sanitize_text_field($request->get_param('cylinder')),
-        'colour' => sanitize_text_field($request->get_param('colour')),
-        'keepers' => sanitize_text_field($request->get_param('keepers')),
-        'contact' => sanitize_text_field($request->get_param('contact')),
-        'email' => sanitize_email($request->get_param('email')),
-        'info' => sanitize_textarea_field($request->get_param('info')),
-        'fuel' => sanitize_text_field($request->get_param('fuel')),
-        'mot' => sanitize_text_field($request->get_param('mot')),
-        'trans' => sanitize_text_field($request->get_param('trans')),
-        'doors' => intval($request->get_param('doors')),
-        'mot_due' => sanitize_text_field($request->get_param('mot_due')),
-        'leadid' => sanitize_text_field($request->get_param('leadid')),
-        'resend' => sanitize_text_field($request->get_param('resend')),
-        'vin' => sanitize_text_field($request->get_param('vin')),
-        'milage' => sanitize_text_field($request->get_param('milage')), 
-    ];
+// Hook for Action Scheduler to process queued leads in the background
+add_action('process_lead_async', 'process_queued_lead');
 
-// Get submission_url and ip_address directly from request parameters
-$submission_url = sanitize_url($request->get_param('submission_url'));
-$ip_address = sanitize_text_field($request->get_param('ip_address'));
-
-// Decode and parse query string
-$decoded_url = html_entity_decode($submission_url);
-$query_string = parse_url($decoded_url, PHP_URL_QUERY);
-parse_str($query_string, $query_params);
-
-// Get tracking params from request OR fallback to parsed URL
-$vt_campaign = sanitize_text_field($request->get_param('vt_campaign') ?: ($query_params['vt_campaign'] ?? ''));
-$utm_source  = sanitize_text_field($request->get_param('utm_source') ?: ($query_params['utm_source'] ?? ''));
-$vt_keyword  = sanitize_text_field($request->get_param('vt_keyword') ?: ($query_params['vt_keyword'] ?? ''));
-$vt_adgroup  = sanitize_text_field($request->get_param('vt_adgroup') ?: ($query_params['vt_adgroup'] ?? ''));
-    // Assign all collected and extracted data to lead_data
-    $lead_data['submission_url'] = $submission_url;
-    $lead_data['ip_address'] = $ip_address;
-    $lead_data['vt_campaign'] = $vt_campaign;   // Store directly
-    $lead_data['utm_source'] = $utm_source;     // Store directly
-    $lead_data['vt_keyword'] = $vt_keyword;     // Store directly
-    $lead_data['vt_adgroup'] = $vt_adgroup;     // Store directly
-    $lead_data['campaign_id'] = $vt_campaign;   // campaign_id now maps directly to vt_campaign
-
-    // Calculate source domain (logic remains the same, uses the processed submission_url)
-    $source_domain = '';
-    if (!empty($submission_url)) {
-        $parsed_url = parse_url($submission_url);
-        if (isset($parsed_url['scheme']) && isset($parsed_url['host'])) {
-            $source_domain = $parsed_url['scheme'] . '://' . $parsed_url['host'] . '/';
-        }
+/**
+ * Action Scheduler callback — receives the queued lead data array and hands it
+ * to the core processor. Runs asynchronously, decoupled from the HTTP request.
+ *
+ * @param array $args Contains 'lead_data' key with all lead fields.
+ */
+function process_queued_lead($args) {
+    if (empty($args['lead_data']) || !is_array($args['lead_data'])) {
+        error_log('process_queued_lead: received invalid or empty lead_data');
+        return;
     }
-    $lead_data['source_domain'] = $source_domain;
+    process_lead_data($args['lead_data']);
+}
+
+function process_lead_data(array $lead_data) {
+    // All sanitisation and field derivation is done in queue_lead_submission() before
+    // the job is queued. This function receives a fully-populated $lead_data array.
     $postcode_prefix = substr($lead_data['postcode'], 0, 2);
 $eligible_recipients = get_eligible_recipients_for_lead($postcode_prefix, $lead_data['vin'], $lead_data['model']);
 
