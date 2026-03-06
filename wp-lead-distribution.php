@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WordPress Lead Distribution
  * Description: Collects and distributes leads to users on a subscription basis.
- * Version: 4.2.1
+ * Version: 5.0.0
  * Author: D.Kandekore
  */
 
@@ -25,6 +25,7 @@ include_once plugin_dir_path(__FILE__) . 'products/credits.php';
 include_once plugin_dir_path(__FILE__) . 'products/lead-distribution.php';
 include_once plugin_dir_path(__FILE__) . 'products/product-meta.php';
 include_once plugin_dir_path(__FILE__) . 'admin/admin-pages.php';
+include_once plugin_dir_path(__FILE__) . 'admin/reports-dashboard.php';
 include_once plugin_dir_path(__FILE__) . 'admin/resend.php';
 
 

@@ -4,6 +4,9 @@ include_once plugin_dir_path(__FILE__) . '../includes/load-postcodes.php';
 function register_my_plugin_menu_pages() {
     add_menu_page('Lead Management', 'Lead Management', 'manage_options', 'lead-management-dashboard', 'render_lead_management_dashboard', 'dashicons-admin-site', 6);
 
+    // Reports Dashboard (all analytics in one place)
+    add_submenu_page('lead-management-dashboard', 'Reports Dashboard', 'Reports Dashboard', 'manage_options', 'lead-reports-dashboard', 'render_reports_dashboard_page');
+
     // Register new URL Reports submenu
     add_submenu_page('lead-management-dashboard', 'Lead URL Reports', 'URL Reports', 'manage_options', 'lead-url-reports', 'render_lead_url_reports_page');
 
