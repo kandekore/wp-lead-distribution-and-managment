@@ -125,11 +125,10 @@ function store_lead($lead_data, $user_id) {
     ];
 
     $post_id = wp_insert_post($post_data);
-    return $post_id;
-
     if (is_wp_error($post_id)) {
         error_log('Failed to store lead: ' . $post_id->get_error_message());
     }
+    return $post_id;
 }
 
 add_action('restrict_manage_posts', 'custom_lead_filters', 10, 2);

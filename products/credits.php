@@ -139,7 +139,7 @@ function renew_subscription_for_user_auto($user_id) {
                             $message = 'Dear user, your subscription renewal payment has failed. Please update your payment method or renew manually.';
                             send_credit_notification($user_id, $subject, $message);
                             notify_admin('Subscription Renewal Failed', "User ID $user_id had a renewal payment failure.");
-                            exit();
+                            return; // Do not exit() — allow the cron to continue processing remaining users
                         } else {
                             $subscription->payment_complete();
                             delete_user_meta($user_id, 'renewal_payment_failed');
@@ -266,13 +266,17 @@ function notify_subscription_status_change($subscription, $old_status, $new_stat
 }
 
 
-// Function to manually trigger the credit check via URL
+// Function to manually trigger the credit check via URL (admin only)
 function manual_trigger_credit_check() {
-    if (isset($_GET['trigger_credit_check']) && $_GET['trigger_credit_check'] == '1') {
-        check_user_credits_daily();
-        echo "Credit check triggered manually.";
-        exit();
+    if ( ! isset( $_GET['trigger_credit_check'] ) || $_GET['trigger_credit_check'] !== '1' ) {
+        return;
     }
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( 'You do not have permission to perform this action.', 'Access Denied', 403 );
+    }
+    check_user_credits_daily();
+    echo 'Credit check triggered manually.';
+    exit();
 }
 add_action('init', 'manual_trigger_credit_check');
 

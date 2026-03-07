@@ -20,32 +20,14 @@ add_action('woocommerce_admin_process_product_object', function($product) {
     $product->update_meta_data('_credits', $credits);
 });
 
-// Handle credit assignment when a subscription becomes active or is renewed
-add_action('woocommerce_subscription_status_active', function($subscription) {
-    $user_id = $subscription->get_user_id();
-    $items = $subscription->get_items();
-    foreach ($items as $item) {
-        $product = $item->get_product();
-        if ($product && $product->get_meta('_credits')) {
-            $credits = (int) $product->get_meta('_credits');
-            $existing_credits = (int) get_user_meta($user_id, '_user_credits', true);
-
-            // Add product credits to existing credits
-            $new_total_credits = $existing_credits + $credits;
-            update_user_meta($user_id, '_user_credits', $new_total_credits);
-        }
-    }
-});
-
-// Handle credit assignment for both regular orders and renewals
+// Handle credit assignment when an order is completed (covers both new subscriptions and renewals).
+// The _ld_credits_assigned guard prevents double-assignment if this hook fires more than once.
 add_action('woocommerce_order_status_completed', function($order_id) {
     $order = wc_get_order($order_id);
     $user_id = $order->get_user_id();
 
     if (!$user_id) return;
-
-    // Check if this is a subscription renewal
-    $is_renewal = function_exists('wcs_order_contains_renewal') && wcs_order_contains_renewal($order);
+    if ($order->get_meta('_ld_credits_assigned')) return; // Idempotency guard
 
     foreach ($order->get_items() as $item) {
         $product = $item->get_product();
@@ -53,14 +35,12 @@ add_action('woocommerce_order_status_completed', function($order_id) {
         if ($product && $product->get_meta('_credits')) {
             $credits = (int) $product->get_meta('_credits');
             $existing_credits = (int) get_user_meta($user_id, '_user_credits', true);
-
-            // Add product credits to the user's existing credits
-            $new_total_credits = $existing_credits + $credits;
-
-            // Update user credits
-            update_user_meta($user_id, '_user_credits', $new_total_credits);
+            update_user_meta($user_id, '_user_credits', $existing_credits + $credits);
         }
     }
+
+    $order->update_meta_data('_ld_credits_assigned', '1');
+    $order->save();
 }, 10, 1);
 
 // Add "Renew on Credit Depletion" checkbox in product settings

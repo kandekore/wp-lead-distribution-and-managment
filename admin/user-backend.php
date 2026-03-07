@@ -211,20 +211,12 @@ function save_admin_edited_user_postcode_selections($user_id) {
         return false;
     }
 
-    error_log('Saving postcode areas for user ID: ' . $user_id); // Debugging log
-    error_log('POST data: ' . print_r($_POST, true)); // Log the entire $_POST array
-
     if (isset($_POST['postcode_areas'])) {
         $sanitized_areas = array();
         foreach ($_POST['postcode_areas'] as $region => $codes) {
             $sanitized_areas[$region] = array_map('sanitize_text_field', $codes);
         }
         update_user_meta($user_id, 'selected_postcode_areas', json_encode($sanitized_areas));
-
-        // Debugging log
-        error_log('Saved postcode areas: ' . json_encode($sanitized_areas));
-    } else {
-        error_log('No postcode areas found in the request.');
     }
 }
 add_action('personal_options_update', 'save_admin_edited_user_postcode_selections');

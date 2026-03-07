@@ -1,6 +1,81 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
+// ─── CSV Export ───────────────────────────────────────────────────────────────
+
+add_action('admin_post_ld_export_leads', 'lmd_export_leads_csv');
+
+function lmd_export_leads_csv(): void {
+    if (!current_user_can('manage_options')) wp_die('Access denied.');
+    check_admin_referer('ld_export_leads');
+
+    global $wpdb;
+
+    $period = sanitize_key($_GET['period'] ?? '30days');
+    $dates  = lmd_period_dates($period);
+    $dw     = lmd_raw_date_where($dates);
+
+    $rows = $wpdb->get_results(
+        "SELECT p.ID, p.post_date, p.post_author FROM {$wpdb->posts} p
+         WHERE p.post_type='lead' AND p.post_status='publish' {$dw}
+         ORDER BY p.post_date DESC",
+        ARRAY_A
+    );
+
+    // Gather all meta in a single query
+    $ids = wp_list_pluck($rows, 'ID');
+    $meta_map = [];
+    if ($ids) {
+        $placeholders = implode(',', array_fill(0, count($ids), '%d'));
+        $meta_rows    = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT post_id, meta_key, meta_value FROM {$wpdb->postmeta}
+                 WHERE post_id IN ({$placeholders})
+                 AND meta_key IN ('leadid','registration','model','postcode','contact','email','fuel','transmission','date','source_domain','vt_campaign','utm_source','assigned_user')",
+                ...$ids
+            ),
+            ARRAY_A
+        );
+        foreach ($meta_rows as $m) {
+            $meta_map[$m['post_id']][$m['meta_key']] = $m['meta_value'];
+        }
+    }
+
+    // Stream the CSV
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="leads-' . $period . '-' . date('Y-m-d') . '.csv"');
+    header('Pragma: no-cache');
+
+    $out = fopen('php://output', 'w');
+    fputcsv($out, ['Lead ID', 'Registration', 'Model', 'Postcode', 'Contact', 'Email', 'Fuel', 'Transmission', 'Year', 'Source Domain', 'Campaign', 'UTM Source', 'Agent', 'Date']);
+
+    foreach ($rows as $row) {
+        $m   = $meta_map[$row['ID']] ?? [];
+        $uid = $m['assigned_user'] ?? 0;
+        $u   = $uid ? get_userdata((int)$uid) : null;
+
+        fputcsv($out, [
+            $m['leadid']        ?? '',
+            $m['registration']  ?? '',
+            $m['model']         ?? '',
+            $m['postcode']      ?? '',
+            $m['contact']       ?? '',
+            $m['email']         ?? '',
+            $m['fuel']          ?? '',
+            $m['transmission']  ?? '',
+            $m['date']          ?? '',
+            $m['source_domain'] ?? '',
+            $m['vt_campaign']   ?? '',
+            $m['utm_source']    ?? '',
+            $u ? $u->display_name : '',
+            $row['post_date'],
+        ]);
+    }
+
+    fclose($out);
+    exit;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function lmd_period_dates(string $period): array {
@@ -192,6 +267,13 @@ function lmd_tab_overview(string $period, array $dates): void {
     echo "</div>";
 
     echo "</div>"; // .lmd-two-col
+
+    // Export button
+    $export_url = wp_nonce_url(
+        admin_url('admin-post.php?action=ld_export_leads&period=' . $period),
+        'ld_export_leads'
+    );
+    echo "<p style='margin-top:16px'><a href='" . esc_url($export_url) . "' class='button button-secondary'>&#11015; Export leads as CSV (" . esc_html($dates['label']) . ")</a></p>";
 }
 
 // ─── Tab 2: Sources & Campaigns ──────────────────────────────────────────────

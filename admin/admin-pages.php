@@ -16,6 +16,7 @@ function register_my_plugin_menu_pages() {
     add_submenu_page('lead-management-dashboard', 'Master Admin Settings', 'Master Admin Settings', 'manage_options', 'master-admin-settings', 'master_admin_settings_page');
     add_submenu_page('lead-management-dashboard', 'Fallback User Settings', 'Fallback User Settings', 'manage_options', 'fallback-user-settings', 'render_fallback_user_settings_page');
 add_submenu_page('lead-management-dashboard', 'SMS Provider Settings', 'SMS Providers', 'manage_options', 'sms-provider-settings', 'wc_custom_sms_settings_page_html');
+    add_submenu_page('lead-management-dashboard', 'Audit Log', 'Audit Log', 'manage_options', 'lead-audit-log', 'render_audit_log_page');
     remove_submenu_page('lead-management-dashboard', 'lead-management-dashboard');
 }
 

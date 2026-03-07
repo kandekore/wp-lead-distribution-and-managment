@@ -22,8 +22,19 @@ function process_queued_lead($args) {
 function process_lead_data(array $lead_data) {
     // All sanitisation and field derivation is done in queue_lead_submission() before
     // the job is queued. This function receives a fully-populated $lead_data array.
+
+    // Duplicate detection — drop silently if this contact/email+postcode was seen in the last 24 h.
+    if (lmd_is_duplicate_lead($lead_data)) {
+        lmd_audit('duplicate_dropped', $lead_data['leadid'], 0, 'Lead dropped as duplicate.', [
+            'postcode' => $lead_data['postcode'],
+            'contact'  => $lead_data['contact'],
+            'email'    => $lead_data['email'],
+        ]);
+        return;
+    }
+
     $postcode_prefix = substr($lead_data['postcode'], 0, 2);
-$eligible_recipients = get_eligible_recipients_for_lead($postcode_prefix, $lead_data['vin'], $lead_data['model']);
+    $eligible_recipients = get_eligible_recipients_for_lead($postcode_prefix, $lead_data['vin'], $lead_data['model']);
 
     // Deserialize your settings array
     $settings = get_option('master_admin_settings');
@@ -92,6 +103,10 @@ $eligible_recipients = get_eligible_recipients_for_lead($postcode_prefix, $lead_
             $lead_id = store_lead($lead_data, $master_admin_user_id);
             assign_lead_to_user($master_admin_user_id, $lead_data, $lead_id);
             if (!is_wp_error($lead_id)) {
+                lmd_audit('master_admin', $lead_data['leadid'], $master_admin_user_id, 'Lead routed to Master Admin.', [
+                    'postcode' => $lead_data['postcode'],
+                    'model'    => $lead_data['model'],
+                ]);
                 return new WP_REST_Response(['message' => 'Lead sent successfully to Master Admin'], 200);
             } else {
                 return new WP_REST_Response(['message' => 'Failed to store lead for Master Admin'], 500);
@@ -190,6 +205,9 @@ if (empty($eligible_recipients)) {
                 }
             }
         } else {
+            lmd_audit('no_recipients', $lead_data['leadid'], 0, 'No eligible recipients and fallback is disabled.', [
+                'postcode_prefix' => $postcode_prefix,
+            ]);
             return new WP_REST_Response(['message' => 'No eligible recipients for this postcode and Fallback User is disabled'], 404);
         }
     }
@@ -207,9 +225,17 @@ if (empty($eligible_recipients)) {
     }
 
     // Deduct a credit from the chosen recipient and send the lead
+    $credits_before = (int) get_user_meta($recipient_id, '_user_credits', true);
     if (deduct_credit_from_user($recipient_id)) {
+        $credits_after = (int) get_user_meta($recipient_id, '_user_credits', true);
         assign_lead_to_user($recipient_id, $lead_data, $lead_id);
         send_lead_email_to_user($recipient_id, $lead_data);
+        lmd_audit('lead_assigned', $lead_data['leadid'], $recipient_id, 'Lead assigned to agent.', [
+            'postcode'       => $lead_data['postcode'],
+            'model'          => $lead_data['model'],
+            'credits_before' => $credits_before,
+            'credits_after'  => $credits_after,
+        ]);
         return new WP_REST_Response(['message' => 'Lead sent successfully to ' . $recipient_id], 200);
     } else {
         return new WP_REST_Response(['message' => 'Failed to send lead, user out of credits'], 500);
@@ -588,21 +614,3 @@ function update_user_postcode_queues($user_id, $old_user_data) {
     }
 }
 
-function process_lead_submission_with_lock(WP_REST_Request $request) {
-    $lock_key = 'process_lead_lock';
-    $lock_timeout = 10; // Lock timeout in seconds
-
-    // Attempt to acquire lock
-    if (get_transient($lock_key)) {
-        return new WP_REST_Response(['message' => 'System is busy, please try again'], 429);
-    }
-
-    set_transient($lock_key, true, $lock_timeout);
-
-    // [Process lead submission logic goes here]
-
-    // Release lock
-    delete_transient($lock_key);
-
-    return new WP_REST_Response(['message' => 'Lead processed successfully'], 200);
-}
